@@ -400,15 +400,16 @@ class Comment < ApplicationRecord
     # comments per weekday so seeing rollover between sibling comments is rare. Importantly, even
     # when it is 'wrong', it gives a stable sort.
     Comment.connection.execute <<~SQL
-      UPDATE comments SET
-        score = (select coalesce(sum(vote), 0) from votes where comment_id = comments.id),
-        flags = (select count(*) from votes where comment_id = comments.id and vote = -1),
-        confidence = #{new_confidence},
-        confidence_order = concat(lpad(char(65535 - floor(#{new_confidence} * 65535) using binary), 2, '\0'), char(id & 0xff using binary))
-      WHERE id = #{id.to_i}
-    SQL
+    UPDATE comments SET
+      score = (SELECT COALESCE(SUM(vote), 0) FROM votes WHERE comment_id = comments.id),
+      flags = (SELECT COUNT(*) FROM votes WHERE comment_id = comments.id AND vote = -1),
+      confidence = #{new_confidence}
+    WHERE id = #{id.to_i}
+  SQL
+  
     story.update_cached_columns
   end
+
 
   def gone_text
     if is_moderated?
@@ -654,8 +655,7 @@ class Comment < ApplicationRecord
           select
             c.id,
             0 as depth,
-            (select count(*) from comments where parent_comment_id = c.id) as reply_count,
-            cast(confidence_order as char(#{Comment::COP_LENGTH}) character set binary) as confidence_order_path
+            0 as confidence_order_path
             from comments c
             where
               thread_id in (#{thread_ids.join(", ")}) and
@@ -665,10 +665,7 @@ class Comment < ApplicationRecord
             c.id,
             discussion.depth + 1,
             (select count(*) from comments where parent_comment_id = c.id),
-            cast(concat(
-              left(discussion.confidence_order_path, 3 * (depth + 1)),
-              c.confidence_order
-            ) as char(#{Comment::COP_LENGTH}) character set binary)
+            0
           from comments c join discussion on c.parent_comment_id = discussion.id
           )
           select * from discussion as comments
@@ -698,7 +695,7 @@ class Comment < ApplicationRecord
             c.id,
             0 as depth,
             (select count(*) from comments where parent_comment_id = c.id) as reply_count,
-            cast(confidence_order as char(#{Comment::COP_LENGTH}) character set binary) as confidence_order_path
+            0 as confidence_order_path
             from comments c
             join stories on stories.id = c.story_id
             where
@@ -709,10 +706,7 @@ class Comment < ApplicationRecord
             c.id,
             discussion.depth + 1,
             (select count(*) from comments where parent_comment_id = c.id),
-            cast(concat(
-              left(discussion.confidence_order_path, 3 * (depth + 1)),
-              c.confidence_order
-            ) as char(#{Comment::COP_LENGTH}) character set binary)
+            0
           from comments c join discussion on c.parent_comment_id = discussion.id
           )
           select * from discussion as comments

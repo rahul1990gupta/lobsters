@@ -183,7 +183,7 @@ class User < ApplicationRecord
     username_regex = username.gsub(/_|-/, "[-_]")
     return unless username_regex.include?("[-_]")
 
-    collisions = User.where("username REGEXP ?", username_regex).where.not(id: id)
+    collisions = User.where("username ~ ?", username_regex).where.not(id: id)
     errors.add(:username, "is already in use (perhaps swapping _ and -)") if collisions.any?
   end
 
@@ -430,8 +430,8 @@ class User < ApplicationRecord
     return if is_banned? # https://www.youtube.com/watch?v=UcZzlPGnKdU
     self.email = "#{username}@lobsters.example" if \
       karma < 0 ||
-        (comments.where("created_at >= now() - interval 30 day AND is_deleted").count +
-         stories.where("created_at >= now() - interval 30 day AND is_deleted AND is_moderated")
+        (comments.where("created_at >= now() - interval '30 day' AND is_deleted").count +
+         stories.where("created_at >= now() - interval '30 day' AND is_deleted AND is_moderated")
            .count >= 3) ||
         FlaggedCommenters.new("90d").check_list_for(self)
   end
