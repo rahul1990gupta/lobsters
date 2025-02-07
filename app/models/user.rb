@@ -433,11 +433,11 @@ class User < ApplicationRecord
   def good_riddance?
     return if is_banned? # https://www.youtube.com/watch?v=UcZzlPGnKdU
     self.email = "#{username}@lobsters.example" if \
-      karma < 0 ||
-        (comments.where("created_at >= now() - interval 30 day AND is_deleted").count +
-         stories.where("created_at >= now() - interval 30 day AND is_deleted AND is_moderated")
-           .count >= 3) ||
-        FlaggedCommenters.new("90d").check_list_for(self)
+     karma < 0 ||
+     (comments.where("created_at >= now() - INTERVAL \'30 days\' AND is_deleted").count +
+     stories.where("created_at >= now() - INTERVAL \'30 days\' AND is_deleted AND is_moderated")
+       .count >= 3) ||
+    FlaggedCommenters.new("90d").check_list_for(self)
   end
 
   def grant_moderatorship_by_user!(user)

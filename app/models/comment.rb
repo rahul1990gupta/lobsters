@@ -47,7 +47,7 @@ class Comment < ApplicationRecord
   scope :above_average, -> {
     joins(:story)
       .joins("left outer join comment_stats on date(comments.created_at) = comment_stats.date")
-      .where("comments.score > coalesce(comment_stats.`average`, 3)")
+      .where("comments.score > coalesce(comment_stats.average, 3)")
   }
   scope :on_stories_not_authored_by, ->(user) {
     joins(:story)
@@ -417,7 +417,7 @@ class Comment < ApplicationRecord
           score = (select coalesce(sum(vote), 0) from votes where comment_id = comments.id),
           flags = (select count(*) from votes where comment_id = comments.id and vote = -1),
           confidence = #{new_confidence},
-          confidence_order = concat(lpad(char(65535 - floor(#{new_confidence} * 65535) using binary), 2, '\0'), char(id & 0xff using binary))
+          confidence_order = concat(lpad(chr(65535 - floor(#{new_confidence} * 65535)), 2, '\0'), chr(id & 0xff))
         WHERE id = #{id.to_i}
       SQL
     end
@@ -669,7 +669,7 @@ class Comment < ApplicationRecord
             c.id,
             0 as depth,
             (select count(*) from comments where parent_comment_id = c.id) as reply_count,
-            cast(confidence_order as char(#{Comment::COP_LENGTH}) character set binary) as confidence_order_path
+            cast(confidence_order as char(#{Comment::COP_LENGTH})) as confidence_order_path
             from comments c
             where
               thread_id in (#{thread_ids.join(", ")}) and
@@ -682,7 +682,7 @@ class Comment < ApplicationRecord
             cast(concat(
               left(discussion.confidence_order_path, 3 * (depth + 1)),
               c.confidence_order
-            ) as char(#{Comment::COP_LENGTH}) character set binary)
+            ) as char(#{Comment::COP_LENGTH}))
           from comments c join discussion on c.parent_comment_id = discussion.id
           )
           select * from discussion as comments
@@ -712,7 +712,7 @@ class Comment < ApplicationRecord
             c.id,
             0 as depth,
             (select count(*) from comments where parent_comment_id = c.id) as reply_count,
-            cast(confidence_order as char(#{Comment::COP_LENGTH}) character set binary) as confidence_order_path
+            cast(confidence_order as char(#{Comment::COP_LENGTH})) as confidence_order_path
             from comments c
             join stories on stories.id = c.story_id
             where
@@ -726,7 +726,7 @@ class Comment < ApplicationRecord
             cast(concat(
               left(discussion.confidence_order_path, 3 * (depth + 1)),
               c.confidence_order
-            ) as char(#{Comment::COP_LENGTH}) character set binary)
+            ) as char(#{Comment::COP_LENGTH}))
           from comments c join discussion on c.parent_comment_id = discussion.id
           )
           select * from discussion as comments

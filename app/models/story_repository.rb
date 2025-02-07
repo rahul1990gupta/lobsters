@@ -35,9 +35,9 @@ class StoryRepository
         from comments
         where
           comments.story_id = stories.id and
-          comments.created_at >= date_sub(now(), interval 3 day)
+          comments.created_at >= now() - interval \'3 day\'
       ) as latest_comment_id')
-      .order("latest_comment_id desc")
+      .order('latest_comment_id DESC')
   end
 
   def newest_by_user(user)

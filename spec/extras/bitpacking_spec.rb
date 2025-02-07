@@ -19,29 +19,28 @@ end
 describe "sql assumptions" do
   describe "char" do
     it "handles zero" do
-      expect(one_result("char(0 using binary)")).to be_bytes("\x00")
+      expect(one_result("chr(0)")).to be_bytes("\x00")
     end
 
     it "handles small int" do
-      expect(one_result("char(7 using binary)")).to be_bytes("\x07")
+      expect(one_result("chr(7)")).to be_bytes("\x07")
     end
 
     it "handles 2^8-1" do
-      expect(one_result("char(255 using binary)")).to be_bytes("\xff")
+      expect(one_result("chr(255)")).to be_bytes("\xff")
     end
 
     it "overflows big-endian" do
-      expect(one_result("char(256 using binary)")).to be_bytes("\x01\x00")
-      expect(one_result("char(258 using binary)")).to be_bytes("\x01\x02")
+      expect(one_result("chr(256)")).to be_bytes("\x01\x00")
+      expect(one_result("chr(258)")).to be_bytes("\x01\x02")
     end
   end
 
   describe "concat" do
     it "can concatenate raw bytes" do
-      expect(one_result("concat(char(1 using binary), char(2 using binary))")).to \
-        be_bytes("\x01\x02")
+      expect(one_result("concat(chr(1), chr(2))")).to be_bytes("\x01\x02")
       expect(
-        one_result("concat(char(1 using binary), char(2 using binary), char(3 using binary))")
+        one_result("concat(chr(1), chr(2), chr(3))")
       ).to be_bytes("\x01\x02\x03")
     end
   end
@@ -49,35 +48,32 @@ describe "sql assumptions" do
   describe "lpad" do
     it "pads null to null" do
       # this is two ways of saying 'pad with nulls'; included to avoid padding with '0' instead of '\0'
-      expect(one_result("lpad(null, 2, char(0 using binary))")).to eq(nil)
+      expect(one_result("lpad(null, 2, chr(0))")).to eq(nil)
       expect(one_result("lpad(null, 2, '\0')")).to eq(nil)
     end
-
+  
     it "pads empty string to two bytes" do
       expect(one_result("lpad('', 2, '\0')")).to be_bytes("\x00\x00")
     end
-
+  
     it "pads one byte to two" do
-      expect(one_result("lpad(char(0 using binary), 2, '\0')")).to \
-        be_bytes("\x00\x00")
+      expect(one_result("lpad(chr(0), 2, '\0')")).to be_bytes("\x00\x00")
     end
-
+  
     it "doesn't change two bytes" do
-      expect(one_result("lpad(char(258 using binary), 2, '\0')")).to \
-        be_bytes("\x01\x02")
+      expect(one_result("lpad(chr(258), 2, '\0')")).to be_bytes("\x01\x02")
     end
-
+  
     it "pads on the left, per name" do
-      expect(one_result("lpad(char(1 using binary), 2, char(0 using binary))")).to \
-        be_bytes("\x00\x01")
+      expect(one_result("lpad(chr(1), 2, chr(0))")).to be_bytes("\x00\x01")
     end
-
+  
     it "truncates on the right" do
       expect(one_result("
         lpad(
-          concat(char(1 using binary), char(2 using binary), char(3 using binary)),
+          concat(chr(1), chr(2), chr(3)),
           2,
-          char(0 using binary)
+          char(0)
         )")).to be_bytes("\x01\x02")
     end
   end
@@ -111,34 +107,34 @@ describe "sql assumptions" do
   describe "confidence_order" do
     it "is low for a high-voted comment" do
       expect(one_result("
-        lpad(char(65535 - floor(0.98 * 65535) using binary), 2, '\0')
+        lpad(chr(65535 - floor(0.98 * 65535)), 2, '\0')
       ").bytes).to eq([5, 31])
     end
 
     it "is middle for a low-score comment" do
       expect(one_result("
-        lpad(char(65535 - floor(0.464 * 65535) using binary), 2, '\0')
+        lpad(chr(65535 - floor(0.464 * 65535)), 2, '\0')
         ").bytes).to eq([137, 55])
     end
 
     it "is high for a heavily flagged comment" do
       expect(one_result("
-        lpad(char(65535 - floor(0.05 * 65535) using binary), 2, '\0')
+        lpad(chr(65535 - floor(0.05 * 65535)), 2, '\0')
       ").bytes).to eq([243, 51])
     end
 
     it "is close to ffff for the worst score" do
       expect(one_result("
-        lpad(char(65535 - floor(0.00001 * 65535) using binary), 2, '\0')
+        lpad(chr(65535 - floor(0.00001 * 65535)), 2, '\0')
       ").bytes).to eq([255, 255])
     end
   end
 
   describe "cast() confidence_order to char for base case of recursive CTE" do
-    it "is left-aligned because sql sorts the char column lexiographically" do
-      # in the CTE this is char(93) but 6 is more than enough to verify assumption
-      expect(one_result("cast(char(0x010203 using binary) as char(6) character set binary)")).to \
-        be_bytes("\01\02\03\00\00\00")
+    it "is left-aligned because sql sorts the char column lexicographically" do
+      # In the CTE this is char(93) but 6 is more than enough to verify assumption
+      result = one_result("LPAD(CAST(decode('010203', 'hex') AS CHAR(6)), 6, '\0')")
+      expect(result).to be_bytes("\01\02\03\00\00\00")
     end
   end
 
