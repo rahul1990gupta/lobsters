@@ -152,7 +152,8 @@ class Search
         value = flatten_title value
         query.where!(
           story: Story.joins(:story_text).where(
-            "MATCH(story_texts.title) AGAINST ('+#{value}' in boolean mode)"
+            "to_tsvector('english', story_texts.title) @@ to_tsquery('english', ?)",
+             value.split.map { |s| "#{s}:*" }.join(" & ")
           )
         )
       when :url
@@ -176,8 +177,7 @@ class Search
     end
     if terms.any?
       terms_sql = <<~SQL.tr("\n", " ")
-        MATCH(comment)
-        AGAINST ('#{terms.map { |s| "+#{s}" }.join(" ")}' in boolean mode)
+      to_tsvector('english', comment) @@ to_tsquery('english', '#{terms.map { |s| s.include?(" ") ? "'#{s}'" : s }.join(" & ")}')
       SQL
       query.where! terms_sql
     end
@@ -278,17 +278,19 @@ class Search
         terms.append val if !val.empty?
       end
     end
+    #AGAINST('+' in boolean mode) for full text search is replaced by to_tsvector and to_tsquery of postgres
     if terms.any?
       terms_sql = <<~SQL.tr("\n", " ")
-        MATCH(story_texts.title, story_texts.description, story_texts.body)
-        AGAINST ('#{terms.map { |s| "+#{s}" }.join(", ")}' in boolean mode)
+      to_tsvector('english', story_texts.title || ' ' || story_texts.description || ' ' || story_texts.body) 
+      @@ to_tsquery('english', '#{terms.map { |s| s.include?(" ") ? "'#{s}'" : s }.join(" & ")}')
       SQL
-      query.joins!(:story_text).where! terms_sql
+      query.joins!(:story_text).where!(terms_sql)
     end
     if tags
       # This searches tags by subquery because otherwise Rails recognizes the join against tags and
       # thinks the .tags association preload is satisfied, so returned stories will only have the
       # searched-for tags.
+
       query.joins!(<<~SQL.tr("\n", "")
         inner join (
           select stories.id

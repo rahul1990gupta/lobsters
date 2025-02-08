@@ -13,9 +13,9 @@ class ModController < ApplicationController
     @moderations = Moderation.all
       .eager_load(:moderator, :story, :tag, :user, comment: [:story, :user])
       .where("moderator_user_id != ? or moderator_user_id is null", @user.id)
-      .where("moderations.created_at >= (NOW() - INTERVAL 1 MONTH)")
+      .where("moderations.created_at >= now() - interval \'1 month\'")
       .order("moderations.id desc")
-  end
+  end 
 
   def flagged_stories
     @title = "Flagged Stories"
