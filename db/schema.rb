@@ -66,7 +66,6 @@ ActiveRecord::Schema[8.0].define(version: 2024_11_06_160424) do
     t.datetime "updated_at", precision: nil
     t.string "short_id", limit: 10, default: "", null: false
     t.bigint "story_id", null: false
-    t.binary "confidence_order", limit: 3, null: false
     t.bigint "user_id", null: false
     t.bigint "parent_comment_id"
     t.bigint "thread_id"
